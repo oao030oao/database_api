@@ -32,15 +32,15 @@ def upload():
     data = request.json
     member = data.get("member")
     inorout = data.get("inorout")  # True/False
-
+    time = data.get("time")
     if member is None or inorout is None:
         return jsonify({"error": "member and inorout are required"}), 400
 
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO final (member, inorout) VALUES (%s, %s)",
-        (member, inorout)
+        "INSERT INTO final (member, inorout, time) VALUES (%s, %s, %s)",
+        (member, inorout, time)
     )
     conn.commit()
     cur.close()
