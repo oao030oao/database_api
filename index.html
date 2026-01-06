@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>進出管理系統 - 完整版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 p-6">
+    <div class="max-w-5xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6 text-slate-800">進出紀錄管理系統</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="md:col-span-2 bg-white p-4 rounded-xl shadow-sm border">
+                <h2 class="font-bold mb-3">🔍 時間篩選</h2>
+                <div class="flex gap-2 items-center">
+                    <input type="date" id="startDate" class="border rounded p-2">
+                    <span>至</span>
+                    <input type="date" id="endDate" class="border rounded p-2">
+                    <button onclick="currentPage=1; loadData()" class="bg-indigo-600 text-white px-4 py-2 rounded">查詢</button>
+                    <button onclick="resetSearch()" class="text-gray-500 underline">重置</button>
+                </div>
+            </div>
+
+            <div class="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
+                <h2 class="font-bold text-orange-700 mb-2">⚠️ 目前在場內人員</h2>
+                <ul id="missingList" class="text-sm text-orange-800 list-disc pl-5">
+                    </ul>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-800 text-white text-sm">
+                    <tr>
+                        <th class="p-4">姓名</th>
+                        <th class="p-4">狀態</th>
+                        <th class="p-4">時間</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTable" class="divide-y divide-slate-100"></tbody>
+            </table>
+            
+            <div class="p-4 flex justify-between items-center bg-slate-50">
+                <button onclick="changePage(-1)" id="prevBtn" class="bg-white border px-4 py-1 rounded shadow-sm disabled:opacity-50">上一頁</button>
+                <span id="pageInfo" class="text-sm font-medium">第 1 頁</span>
+                <button onclick="changePage(1)" id="nextBtn" class="bg-white border px-4 py-1 rounded shadow-sm">下一頁</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const API_BASE = window.location.origin; // 自動抓取當前網址
+
+        async function loadData() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const url = `${API_BASE}/data?page=${currentPage}&start=${start}&end=${end}`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            const tbody = document.getElementById('dataTable');
+            tbody.innerHTML = data.length ? "" : "<tr><td colspan='3' class='p-10 text-center text-gray-400'>沒有更多資料了</td></tr>";
+            
+            data.forEach(item => {
+                const badge = item.inorout ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-4 font-bold">${item.member}</td>
+                        <td class="p-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${badge}">${item.inorout ? '進入' : '出來'}</span></td>
+                        <td class="p-4 text-slate-500 text-sm">${item.time}</td>
+                    </tr>`;
+            });
+            document.getElementById('pageInfo').innerText = `第 ${currentPage} 頁`;
+            document.getElementById('prevBtn').disabled = (currentPage === 1);
+            document.getElementById('nextBtn').disabled = (data.length < 10);
+        }
+
+        async function loadMissing() {
+            const res = await fetch(`${API_BASE}/missing`);
+            const data = await res.json();
+            const list = document.getElementById('missingList');
+            list.innerHTML = data.length ? data.map(name => `<li>${name}</li>`).join('') : "<li>所有人皆已離開</li>";
+        }
+
+        function changePage(step) {
+            currentPage += step;
+            loadData();
+        }
+
+        function resetSearch() {
+            document.getElementById('startDate').value = "";
+            document.getElementById('endDate').value = "";
+            currentPage = 1;
+            loadData();
+        }
+
+        loadData();
+        loadMissing();
+    </script>
+</body>
+</html>
