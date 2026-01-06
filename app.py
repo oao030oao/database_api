@@ -1,78 +1,78 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import psycopg2
 import os
 
 app = Flask(__name__)
+CORS(app)
 
-# --- 修正後的連線設定 ---
+# --- 資料庫連線 (保持你原本的連線邏輯) ---
 def get_db_connection():
-    # 建議直接使用 Render 提供的 DATABASE_URL
-    # 如果你在 Render Environment 設定了這個 Key，這行就足夠了
     db_url = os.environ.get("DATABASE_URL")
-    
     if db_url:
         return psycopg2.connect(db_url)
-    
     return psycopg2.connect(
-        host="dpg-d5cegqbe5dus738dau7g-a.singapore-postgres.render.com", # 需補全完整位址
+        host="dpg-d5cegqbe5dus738dau7g-a.singapore-postgres.render.com",
         database="final_database_xnad",
         user="final_database_xnad_user",
         password="BMojjUkwDRZeQNs2rVdYdV479542lLrV",
         port=5432
     )
-# -----------------------
 
-@app.route("/", methods=["GET"])
-def home():
-    return "API is running"
-
-@app.route("/upload", methods=["POST"])
-def upload():
-    try:
-        data = request.json
-        member = data.get("member")
-        inorout = data.get("inorout")
-        time = data.get("time")
-
-        if member is None or inorout is None:
-            return jsonify({"error": "member and inorout are required"}), 400
-
-        conn = get_db_connection()
-        cur = conn.cursor()
-        # 請確認你的資料表名稱是 final，欄位包含 member, inorout, time
-        cur.execute(
-            "INSERT INTO final (member, inorout, time) VALUES (%s, %s, %s)",
-            (member, inorout, time)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-# 查詢所有紀錄
+# 1. 查詢與分頁 API
 @app.route("/data", methods=["GET"])
 def get_data():
+    page = int(request.args.get('page', 1))
+    start_date = request.args.get('start') # yyyy-mm-dd
+    end_date = request.args.get('end')     # yyyy-mm-dd
+    limit = 10
+    offset = (page - 1) * limit
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute(
-        "SELECT ID, member, inorout, time FROM final ORDER BY ID DESC"
-    )
+    
+    query = "SELECT ID, member, inorout, time FROM final"
+    params = []
+
+    # 時間篩選邏輯
+    if start_date and end_date:
+        query += " WHERE time BETWEEN %s AND %s"
+        params.extend([start_date + " 00:00:00", end_date + " 23:59:59"])
+    
+    query += " ORDER BY time DESC LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
+    
+    cur.execute(query, params)
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
-    result = []
-    for r in rows:
-        result.append({
-            "ID": r[0],
-            "member": r[1].strip(),  # 去掉多餘空白
-            "inorout": r[2],
-            "time": r[3].strftime("%Y-%m-%d %H:%M:%S")
-        })
-
+    result = [{"ID": r[0], "member": r[1].strip(), "inorout": r[2], "time": r[3].strftime("%Y-%m-%d %H:%M:%S")} for r in rows]
     return jsonify(result)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+# 2. 統計「還在裡面」的人員 API
+@app.route("/missing", methods=["GET"])
+def get_missing():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # 邏輯：找最後一筆紀錄是 True (進入) 的人
+    sql = """
+    SELECT member FROM (
+        SELECT DISTINCT ON (member) member, inorout, time
+        FROM final
+        ORDER BY member, time DESC
+    ) AS latest
+    WHERE inorout = True;
+    """
+    cur.execute(sql)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([r[0].strip() for r in rows])
 
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
