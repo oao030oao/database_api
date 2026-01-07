@@ -23,20 +23,20 @@ def get_db_connection():
 @app.route("/data", methods=["GET"])
 def get_data():
     page = int(request.args.get('page', 1))
-    start_date = request.args.get('start') # yyyy-mm-dd
-    end_date = request.args.get('end')     # yyyy-mm-dd
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
     limit = 10
     offset = (page - 1) * limit
 
     conn = get_db_connection()
     cur = conn.cursor()
     
-    query = "SELECT ID, member, inorout, time FROM final"
+    # 這裡加上雙引號處理大寫 ID
+    query = 'SELECT "ID", member, inorout, time FROM final'
     params = []
 
-    # 時間篩選邏輯
     if start_date and end_date:
-        query += " WHERE time BETWEEN %s AND %s"
+        query += ' WHERE time BETWEEN %s AND %s'
         params.extend([start_date + " 00:00:00", end_date + " 23:59:59"])
     
     query += " ORDER BY time DESC LIMIT %s OFFSET %s"
@@ -47,7 +47,15 @@ def get_data():
     cur.close()
     conn.close()
 
-    result = [{"ID": r[0], "member": r[1].strip(), "inorout": r[2], "time": r[3].strftime("%Y-%m-%d %H:%M:%S")} for r in rows]
+    # 這裡對應的 r[0] 就是你的大寫 ID
+    result = [
+        {
+            "ID": r[0], 
+            "member": r[1].strip(), 
+            "inorout": r[2], 
+            "time": r[3].strftime("%Y-%m-%d %H:%M:%S")
+        } for r in rows
+    ]
     return jsonify(result)
 
 # 2. 統計「還在裡面」的人員 API
