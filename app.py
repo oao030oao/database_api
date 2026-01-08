@@ -40,7 +40,7 @@ def upload_data():
         # 插入資料，時間由資料庫自動產生或 Python 產生
         cur.execute(
             'INSERT INTO final (member, inorout, time) VALUES (%s, %s, %s)',
-            (member, inorout, datetime.now(timezone(timedelta(hours=8))))
+            (member, inorout, datetime.now())
         )
         conn.commit()
         cur.close()
@@ -84,7 +84,7 @@ def get_data():
                 "ID": r[0],
                 "member": r[1].strip() if r[1] else "",
                 "inorout": r[2],
-                "time": r[3].strftime("%Y-%m-%d %H:%M:%S") if r[3] else ""
+                "time": (r[3] + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S") if r[3] else ""
             } for r in rows
         ]
         return jsonify(result)
