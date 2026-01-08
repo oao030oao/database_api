@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import psycopg2
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
 
 app = Flask(__name__)
@@ -40,7 +40,7 @@ def upload_data():
         # 插入資料，時間由資料庫自動產生或 Python 產生
         cur.execute(
             'INSERT INTO final (member, inorout, time) VALUES (%s, %s, %s)',
-            (member, inorout, datetime.now())
+            (member, inorout, datetime.now(timezone(timedelta(hours=8))))
         )
         conn.commit()
         cur.close()
